@@ -58,20 +58,27 @@ public abstract class StratAphorDatabase extends RoomDatabase {
     @Override
     public void onCreate(@NonNull SupportSQLiteDatabase db) {
       super.onCreate(db);
-      new PreloadTask()
-          .setSuccessListener((sayings) ->{
-            //TODO Do something with sayings, so we can use them!
-          } )
-          .execute();
+      new PreloadTask().execute();
     }
 
+    @Override
+    public void onOpen(@NonNull SupportSQLiteDatabase db) {
+      super.onOpen(db);
+      StratAphorDatabase database = StratAphorDatabase.getInstance();
+      new BaseFluentAsyncTask<Void, Void, List<Saying>, List<Saying>>()
+          .setPerformer((ignore) -> database.getSayingDao().findAll())
+          .setSuccessListener((sayings) -> {
+            RandomSaying.getInstance().getSayings().addAll(sayings);
+          })
+          .execute();
+    }
   }
 
-  private static  class PreloadTask extends BaseFluentAsyncTask<Void, Void, List<Saying>, List<Saying>>{
+  private static  class PreloadTask extends BaseFluentAsyncTask<Void, Void, Void, Void>{
 
     @Nullable
     @Override
-    protected List<Saying> perform(Void... voids) throws TaskException {
+    protected Void perform(Void... voids) throws TaskException {
       Context context = StratAphorApplication.getInstance().getApplicationContext();
       StratAphorDatabase database = StratAphorDatabase.getInstance();
       try (
@@ -89,11 +96,10 @@ public abstract class StratAphorDatabase extends RoomDatabase {
 
         }
         database.getSayingDao().insert(sayings);
-        return database.getSayingDao().findAll();
+        return null;
       } catch (IOException e) {
         throw new TaskException(e);
       }
-
     }
 
     private List<Saying> loadSayings(long sourceId, String resourceName){
